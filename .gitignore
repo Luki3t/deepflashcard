@@ -1,0 +1,12 @@
+flashcards/build/
+flashcards/.dart_tool/
+flashcards/.flutter-plugins-dependencies
+flashcards/android/.gradle/
+flashcards/android/.kotlin/
+flashcards/android/local.properties
+flashcards/android/key.properties
+flashcards/android/app/*.jks
+flashcards/android/app/*.keystore
+tools/tatoeba/.venv/
+tools/tatoeba/.cache/
+tools/tatoeba/build/
