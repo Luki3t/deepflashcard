@@ -111,15 +111,15 @@ dev_dependencies:
   build_runner: ^2.4.14
   riverpod_lint: ^3.0.1
 
-  # App icon & splash screen generation
+  # App icon generation (dev-time codegen only; icon assets are already
+  # baked into android/app/src/main/res/, package not needed at build time)
   flutter_launcher_icons: ^0.14.3
-  flutter_native_splash: ^2.4.4
 
-# url_launcher_android >=6.3.26 pulls in androidx.core 1.17.0 / androidx.browser
-# 1.9.0, which require AGP 8.9.1+ (this project is on AGP 8.7.0). Pinned to the
-# last version before that bump until the project's AGP is upgraded.
-dependency_overrides:
-  url_launcher_android: 6.3.25
+  # flutter_native_splash removed: its old Android module hardcodes
+  # compileSdk 31, which AGP 8.13's stricter AAR metadata checks reject.
+  # Splash assets are already generated in android/app/src/main/res/ —
+  # re-add temporarily (`flutter pub add dev:flutter_native_splash`) only
+  # if the splash needs to be regenerated, then remove again.
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
