@@ -73,10 +73,6 @@ dependencies:
   # File handling
   file_picker: ^11.0.3
   csv: ^6.0.0
-  share_plus: ^10.1.2
-
-  # Permissions
-  permission_handler: ^11.3.1
 
   # Archive handling
   archive: ^3.6.1
