@@ -52,7 +52,7 @@ dependencies:
   dio: ^5.7.0
 
   # ML Kit for translation
-  google_mlkit_translation: ^0.13.1
+  google_mlkit_translation: ^0.14.0
 
   # Text-to-speech
   flutter_tts: ^4.2.0
