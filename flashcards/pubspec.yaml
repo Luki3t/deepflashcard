@@ -80,7 +80,11 @@ dependencies:
   crypto: ^3.0.6
 
   # App version info (About screen)
-  package_info_plus: ^8.1.2
+  # Stuck on 8.x: package_info_plus >=9.0.0 requires win32 ^6.0.0, but
+  # file_picker 11.0.3 (latest stable, 12.x is beta-only) requires win32
+  # ^5.9.0. win32 is Windows-only so this has zero effect on the Android
+  # build, but pub's solver is platform-agnostic and refuses to resolve.
+  package_info_plus: ^8.3.1
 
   # Opening external links (attribution, licenses)
   url_launcher: ^6.3.1
