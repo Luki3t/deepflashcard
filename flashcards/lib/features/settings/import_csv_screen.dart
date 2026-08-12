@@ -25,8 +25,10 @@ class ImportCsvScreen extends ConsumerStatefulWidget {
 class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
   _Step _step = _Step.pick;
   String? _fileName;
+  String? _rawContent;
   CsvParseResult? _parseResult;
   String? _pickError;
+  String _separator = ',';
 
   // Deck target selection
   bool _createNewDeck = false;
@@ -69,12 +71,28 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
     }
 
     final content = utf8.decode(bytes, allowMalformed: true);
-    final parsed = const ImportService().parse(content);
+    final parsed = const ImportService().parse(
+      content,
+      fieldDelimiter: _separator,
+    );
 
     setState(() {
       _fileName = file.name;
+      _rawContent = content;
       _parseResult = parsed;
       _step = _Step.configure;
+    });
+  }
+
+  void _setSeparator(String separator) {
+    final content = _rawContent;
+    if (content == null) return;
+    setState(() {
+      _separator = separator;
+      _parseResult = const ImportService().parse(
+        content,
+        fieldDelimiter: separator,
+      );
     });
   }
 
@@ -139,8 +157,10 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
     setState(() {
       _step = _Step.pick;
       _fileName = null;
+      _rawContent = null;
       _parseResult = null;
       _pickError = null;
+      _separator = ',';
       _createNewDeck = false;
       _selectedDeckId = null;
       _newDeckNameCtrl.clear();
@@ -181,7 +201,8 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
             const SizedBox(height: 8),
             Text(
               'Expected format (header required):\n'
-              'source_text,target_text,notes',
+              'source_text,target_text,notes\n'
+              '(you can pick the separator on the next screen)',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -227,6 +248,18 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
           '${parsed.rows.length} valid card(s) found'
           '${parsed.errors.isNotEmpty ? ', ${parsed.errors.length} row(s) skipped' : ''}',
           style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        Text('Separator', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: ',', label: Text('Comma ,')),
+            ButtonSegment(value: ';', label: Text('Semicolon ;')),
+            ButtonSegment(value: '\t', label: Text('Tab')),
+          ],
+          selected: {_separator},
+          onSelectionChanged: (s) => _setSeparator(s.first),
         ),
         if (parsed.errors.isNotEmpty) ...[
           const SizedBox(height: 8),

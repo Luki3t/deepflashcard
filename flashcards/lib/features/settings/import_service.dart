@@ -29,7 +29,7 @@ class CsvParseResult {
 class ImportService {
   const ImportService();
 
-  CsvParseResult parse(String rawContent) {
+  CsvParseResult parse(String rawContent, {String fieldDelimiter = ','}) {
     final content = rawContent.startsWith('﻿')
         ? rawContent.substring(1)
         : rawContent;
@@ -41,8 +41,9 @@ class ImportService {
       );
     }
 
-    final table = const CsvToListConverter(
+    final table = CsvToListConverter(
       shouldParseNumbers: false,
+      fieldDelimiter: fieldDelimiter,
     ).convert(content, eol: '\n');
 
     if (table.isEmpty) {
