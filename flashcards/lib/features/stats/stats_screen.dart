@@ -43,9 +43,21 @@ class _StatsBody extends StatelessWidget {
         _Heatmap(activityMap: data.activityMap),
         const SizedBox(height: 24),
         if (data.deckProgress.isNotEmpty) ...[
-          Text(
-            'Progress per deck',
-            style: Theme.of(context).textTheme.titleSmall,
+          Row(
+            children: [
+              Text(
+                'Progress per deck',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.info_outline, size: 18),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => _showDeckProgressInfo(context),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           ...data.deckProgress.map((p) => _DeckProgressRow(progress: p)),
@@ -53,6 +65,28 @@ class _StatsBody extends StatelessWidget {
       ],
     );
   }
+}
+
+void _showDeckProgressInfo(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Progress per deck'),
+      content: const Text(
+        'A card counts as "learned" only after 3 correct reviews in a row. '
+        'Because reviews are spaced out over time (1 day, then 6 days, then '
+        'longer), this takes about a week of study to reach even if you '
+        "answer correctly every time — so it's normal for a new deck to "
+        'show 0 learned for the first few days.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Got it'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _StreakHero extends StatelessWidget {

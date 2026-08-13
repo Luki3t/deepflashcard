@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_constants.dart';
+import '../../core/providers/shared_preferences_provider.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/cards_repository.dart';
+import '../../data/repositories/decks_repository.dart';
+import '../../services/tts_service.dart';
 import 'study_session_notifier.dart';
 
 class MultipleChoiceScreen extends ConsumerWidget {
@@ -21,6 +25,7 @@ class MultipleChoiceScreen extends ConsumerWidget {
             stats: session.stats,
             deckId: deckId,
             totalCards: session.cards.length,
+            dailyLimitReached: session.dailyLimitReached,
           );
         }
         return _ChoiceView(session: session, deckId: deckId);
@@ -109,6 +114,8 @@ class _ChoiceViewState extends ConsumerState<_ChoiceView> {
       _revealed = true;
     });
 
+    _autoSpeak(card);
+
     if (correct) {
       await Future.delayed(const Duration(milliseconds: 500));
       await ref
@@ -116,6 +123,16 @@ class _ChoiceViewState extends ConsumerState<_ChoiceView> {
           .submitRating(4);
     }
     // Wrong: wait for user to tap Continue
+  }
+
+  Future<void> _autoSpeak(FlashCard card) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (!(prefs.getBool(AppConstants.autoPlayTtsKey) ?? false)) return;
+    final deck = await ref
+        .read(decksRepositoryProvider)
+        .getDeckById(card.deckId);
+    if (deck == null) return;
+    ref.read(ttsServiceProvider).speak(card.targetText, deck.targetLanguage);
   }
 
   Future<void> _continue() async {
@@ -267,19 +284,25 @@ class _ChoiceButton extends StatelessWidget {
   }
 }
 
-// Reuse the summary screen from study_screen.dart
-class _SummaryScreen extends StatelessWidget {
+class _SummaryScreen extends ConsumerWidget {
   const _SummaryScreen({
     required this.stats,
     required this.deckId,
     required this.totalCards,
+    required this.dailyLimitReached,
   });
   final SessionStats stats;
   final int? deckId;
   final int totalCards;
+  final bool dailyLimitReached;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final maxNew =
+        prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
+        AppConstants.defaultMaxNewCardsPerDay;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -295,7 +318,11 @@ class _SummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  totalCards == 0 ? 'Nothing to study!' : 'Session complete!',
+                  totalCards > 0
+                      ? 'Session complete!'
+                      : dailyLimitReached
+                      ? 'Daily limit reached'
+                      : 'Nothing to study!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -314,11 +341,43 @@ class _SummaryScreen extends StatelessWidget {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
+                ] else
+                  Text(
+                    dailyLimitReached
+                        ? "You've reached today's new-word limit."
+                        : 'No cards are due right now. Come back later!',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
                 const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: () =>
-                      context.canPop() ? context.pop() : context.go('/'),
+                if (totalCards > 0) ...[
+                  FilledButton(
+                    onPressed: () {
+                      ref.invalidate(studySessionProvider(deckId));
+                    },
+                    child: const Text('Learn More'),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (dailyLimitReached) ...[
+                  OutlinedButton(
+                    onPressed: () {
+                      ref
+                          .read(extraNewCardBudgetProvider.notifier)
+                          .addBatch(maxNew);
+                      ref.invalidate(studySessionProvider(deckId));
+                    },
+                    child: Text('Study $maxNew More'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextButton(
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
                   child: Text(
                     deckId != null ? 'Back to Deck' : 'Back to Decks',
                   ),

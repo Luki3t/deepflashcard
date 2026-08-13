@@ -30,6 +30,23 @@ class ReviewsRepository {
                 r.reviewedAt.isSmallerThanValue(end),
           ))
           .get();
+
+  // Cards logged with previousInterval == 0 were on their very first review
+  // (brand-new cards default to intervalDays 0), so this counts new cards
+  // introduced on the given date — used to enforce the daily new-card cap.
+  Future<int> countNewCardsIntroduced(DateTime date) async {
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+    final rows =
+        await (_db.select(_db.reviewLogs)..where(
+              (r) =>
+                  r.reviewedAt.isBiggerOrEqualValue(start) &
+                  r.reviewedAt.isSmallerThanValue(end) &
+                  r.previousInterval.equals(0),
+            ))
+            .get();
+    return rows.map((r) => r.cardId).toSet().length;
+  }
 }
 
 final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {

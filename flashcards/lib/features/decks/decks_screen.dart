@@ -78,7 +78,9 @@ class _DeckCard extends ConsumerWidget {
     final cardsAsync = ref.watch(watchCardsForDeckProvider(deck.id));
     final cards = cardsAsync.value ?? [];
     final now = DateTime.now();
-    final dueCount = cards.where((c) => !c.nextReview.isAfter(now)).length;
+    final dueCount = cards
+        .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
+        .length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

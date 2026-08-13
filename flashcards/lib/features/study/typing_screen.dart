@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants/app_constants.dart';
+import '../../core/providers/shared_preferences_provider.dart';
 import '../../core/utils/string_utils.dart';
+import '../../data/database/app_database.dart';
+import '../../data/repositories/decks_repository.dart';
+import '../../services/tts_service.dart';
 import 'study_session_notifier.dart';
 
 enum _AnswerState { idle, correct, partial, wrong }
@@ -22,6 +27,7 @@ class TypingScreen extends ConsumerWidget {
             stats: session.stats,
             deckId: deckId,
             totalCards: session.cards.length,
+            dailyLimitReached: session.dailyLimitReached,
           );
         }
         return _TypingView(session: session, deckId: deckId);
@@ -50,13 +56,17 @@ class _TypingView extends ConsumerStatefulWidget {
 class _TypingViewState extends ConsumerState<_TypingView> {
   final _controller = TextEditingController();
   _AnswerState _state = _AnswerState.idle;
+  int _hintLetters = 0;
 
   @override
   void didUpdateWidget(_TypingView old) {
     super.didUpdateWidget(old);
     if (old.session.index != widget.session.index) {
       _controller.clear();
-      setState(() => _state = _AnswerState.idle);
+      setState(() {
+        _state = _AnswerState.idle;
+        _hintLetters = 0;
+      });
     }
   }
 
@@ -80,10 +90,38 @@ class _TypingViewState extends ConsumerState<_TypingView> {
     } else {
       setState(() => _state = _AnswerState.wrong);
     }
+    _autoSpeak(card);
   }
 
   void _showAnswer() {
+    final session =
+        ref.read(studySessionProvider(widget.deckId)).value ?? widget.session;
+    final card = session.currentCard!;
     setState(() => _state = _AnswerState.wrong);
+    _autoSpeak(card);
+  }
+
+  void _revealNextHintLetter(String target) {
+    if (_hintLetters >= target.length) return;
+    setState(() => _hintLetters++);
+  }
+
+  String _hintText(String target) {
+    return List.generate(target.length, (i) {
+      final ch = target[i];
+      if (ch == ' ') return ' ';
+      return i < _hintLetters ? ch : '_';
+    }).join(' ');
+  }
+
+  Future<void> _autoSpeak(FlashCard card) async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (!(prefs.getBool(AppConstants.autoPlayTtsKey) ?? false)) return;
+    final deck = await ref
+        .read(decksRepositoryProvider)
+        .getDeckById(card.deckId);
+    if (deck == null) return;
+    ref.read(ttsServiceProvider).speak(card.targetText, deck.targetLanguage);
   }
 
   Future<void> _rate5() => _rate(5);
@@ -151,6 +189,30 @@ class _TypingViewState extends ConsumerState<_TypingView> {
               },
             ),
           ),
+          if (!revealed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: _hintLetters >= card.targetText.length
+                        ? null
+                        : () => _revealNextHintLetter(card.targetText),
+                    icon: const Icon(Icons.lightbulb_outline, size: 18),
+                    label: const Text('Hint'),
+                  ),
+                  if (_hintLetters > 0)
+                    Expanded(
+                      child: Text(
+                        _hintText(card.targetText),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           const SizedBox(height: 12),
           if (_state == _AnswerState.partial || _state == _AnswerState.wrong)
             Padding(
@@ -195,11 +257,8 @@ class _TypingViewState extends ConsumerState<_TypingView> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 2,
                         child: FilledButton(
-                          onPressed: _controller.text.trim().isEmpty
-                              ? null
-                              : _submit,
+                          onPressed: _submit,
                           child: const Text('Submit'),
                         ),
                       ),
@@ -259,18 +318,25 @@ class _TypingViewState extends ConsumerState<_TypingView> {
   };
 }
 
-class _SummaryScreen extends StatelessWidget {
+class _SummaryScreen extends ConsumerWidget {
   const _SummaryScreen({
     required this.stats,
     required this.deckId,
     required this.totalCards,
+    required this.dailyLimitReached,
   });
   final SessionStats stats;
   final int? deckId;
   final int totalCards;
+  final bool dailyLimitReached;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final maxNew =
+        prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
+        AppConstants.defaultMaxNewCardsPerDay;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -286,7 +352,11 @@ class _SummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  totalCards == 0 ? 'Nothing to study!' : 'Session complete!',
+                  totalCards > 0
+                      ? 'Session complete!'
+                      : dailyLimitReached
+                      ? 'Daily limit reached'
+                      : 'Nothing to study!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -305,11 +375,43 @@ class _SummaryScreen extends StatelessWidget {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
+                ] else
+                  Text(
+                    dailyLimitReached
+                        ? "You've reached today's new-word limit."
+                        : 'No cards are due right now. Come back later!',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
                 const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: () =>
-                      context.canPop() ? context.pop() : context.go('/'),
+                if (totalCards > 0) ...[
+                  FilledButton(
+                    onPressed: () {
+                      ref.invalidate(studySessionProvider(deckId));
+                    },
+                    child: const Text('Learn More'),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (dailyLimitReached) ...[
+                  OutlinedButton(
+                    onPressed: () {
+                      ref
+                          .read(extraNewCardBudgetProvider.notifier)
+                          .addBatch(maxNew);
+                      ref.invalidate(studySessionProvider(deckId));
+                    },
+                    child: Text('Study $maxNew More'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextButton(
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
                   child: Text(
                     deckId != null ? 'Back to Deck' : 'Back to Decks',
                   ),

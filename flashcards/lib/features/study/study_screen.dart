@@ -27,6 +27,7 @@ class StudyScreen extends ConsumerWidget {
             stats: session.stats,
             deckId: deckId,
             totalCards: session.cards.length,
+            dailyLimitReached: session.dailyLimitReached,
           );
         }
         return _StudyView(session: session, deckId: deckId);
@@ -433,13 +434,20 @@ class _SummaryScreen extends ConsumerWidget {
     required this.stats,
     required this.deckId,
     required this.totalCards,
+    required this.dailyLimitReached,
   });
   final SessionStats stats;
   final int? deckId;
   final int totalCards;
+  final bool dailyLimitReached;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final maxNew =
+        prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
+        AppConstants.defaultMaxNewCardsPerDay;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -455,7 +463,11 @@ class _SummaryScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  totalCards == 0 ? 'Nothing to study!' : 'Session complete!',
+                  totalCards > 0
+                      ? 'Session complete!'
+                      : dailyLimitReached
+                      ? 'Daily limit reached'
+                      : 'Nothing to study!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -476,29 +488,33 @@ class _SummaryScreen extends ConsumerWidget {
                   ),
                 ] else
                   Text(
-                    'No cards are due right now. Come back later!',
+                    dailyLimitReached
+                        ? "You've reached today's new-word limit."
+                        : 'No cards are due right now. Come back later!',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
                 const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: () {
-                    ref.invalidate(studySessionProvider(deckId));
-                  },
-                  child: const Text('Study Again'),
-                ),
                 if (totalCards > 0) ...[
-                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () {
+                      ref.invalidate(studySessionProvider(deckId));
+                    },
+                    child: const Text('Learn More'),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (dailyLimitReached) ...[
                   OutlinedButton(
                     onPressed: () {
                       ref
-                          .read(studySessionProvider(deckId).notifier)
-                          .repeatSession();
+                          .read(extraNewCardBudgetProvider.notifier)
+                          .addBatch(maxNew);
+                      ref.invalidate(studySessionProvider(deckId));
                     },
-                    child: const Text('Repeat This Session'),
+                    child: Text('Study $maxNew More'),
                   ),
+                  const SizedBox(height: 12),
                 ],
-                const SizedBox(height: 12),
                 TextButton(
                   onPressed: () {
                     if (context.canPop()) {

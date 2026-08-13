@@ -51,7 +51,9 @@ class _DeckDetailView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cards = cardsAsync.value ?? [];
     final now = DateTime.now();
-    final dueCount = cards.where((c) => !c.nextReview.isAfter(now)).length;
+    final dueCount = cards
+        .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
+        .length;
     final newCount = cards.where((c) => c.repetitions == 0).length;
 
     return Scaffold(

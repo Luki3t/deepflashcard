@@ -6,6 +6,7 @@ import '../../data/database/app_database.dart';
 import '../../data/repositories/cards_repository.dart';
 import '../../data/repositories/reviews_repository.dart';
 import '../../data/repositories/stats_repository.dart';
+import '../stats/stats_providers.dart';
 import 'srs_algorithm.dart';
 
 class SessionStats {
@@ -29,17 +30,37 @@ class StudySessionState {
     required this.index,
     required this.stats,
     this.finished = false,
+    this.dailyLimitReached = false,
   });
 
   final List<FlashCard> cards;
   final int index;
   final SessionStats stats;
   final bool finished;
+  // True when there are still unstudied new cards waiting, but today's
+  // "max new cards per day" budget is used up.
+  final bool dailyLimitReached;
 
   FlashCard? get currentCard => index < cards.length ? cards[index] : null;
 
   double get progress => cards.isEmpty ? 1.0 : index / cards.length;
 }
+
+// Lets the user manually unlock one more batch of new cards today, on top
+// of the configured daily cap, without changing the persisted setting.
+// Lives only in memory (not persisted), so it naturally resets on app
+// restart.
+class ExtraNewCardBudgetNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void addBatch(int amount) => state += amount;
+}
+
+final extraNewCardBudgetProvider =
+    NotifierProvider<ExtraNewCardBudgetNotifier, int>(
+      ExtraNewCardBudgetNotifier.new,
+    );
 
 // In Riverpod 3.x: notifier extends AsyncNotifier<T>,
 // arg is passed through the factory function.
@@ -51,10 +72,15 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
   Future<StudySessionState> build() async {
     final now = DateTime.now();
     final cardsRepo = ref.read(cardsRepositoryProvider);
+    final reviewsRepo = ref.read(reviewsRepositoryProvider);
     final prefs = ref.read(sharedPreferencesProvider);
     final maxNew =
         prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
         AppConstants.defaultMaxNewCardsPerDay;
+    final introducedToday = await reviewsRepo.countNewCardsIntroduced(now);
+    final extraBudget = ref.read(extraNewCardBudgetProvider);
+    final newCardBudget =
+        (maxNew - introducedToday).clamp(0, maxNew).toInt() + extraBudget;
 
     final List<FlashCard> due;
     final List<FlashCard> all;
@@ -68,20 +94,18 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
     }
 
     final dueIds = due.map((c) => c.id).toSet();
-    final newCards = all
-        .where(
-          (c) =>
-              c.repetitions == 0 &&
-              c.intervalDays == 0 &&
-              !dueIds.contains(c.id),
-        )
-        .take(maxNew)
-        .toList();
+    final newCandidates = all.where(
+      (c) =>
+          c.repetitions == 0 && c.intervalDays == 0 && !dueIds.contains(c.id),
+    );
+    final newCards = newCandidates.take(newCardBudget).toList();
+    final dailyLimitReached = newCards.length < newCandidates.length;
 
     return StudySessionState(
       cards: [...due, ...newCards],
       index: 0,
       stats: const SessionStats(),
+      dailyLimitReached: dailyLimitReached,
     );
   }
 
@@ -116,6 +140,9 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
           ),
         );
 
+    ref.invalidate(todayProgressProvider);
+    ref.invalidate(statsDataProvider);
+
     final newStats = current.stats.copyWith(
       reviewed: current.stats.reviewed + 1,
       correct: rating >= 3 ? current.stats.correct + 1 : current.stats.correct,
@@ -138,15 +165,6 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
         stats: newStats,
         finished: finished,
       ),
-    );
-  }
-
-  void repeatSession() {
-    final current = state.value;
-    if (current == null || current.cards.isEmpty) return;
-    final cards = List.of(current.cards)..shuffle();
-    state = AsyncData(
-      StudySessionState(cards: cards, index: 0, stats: const SessionStats()),
     );
   }
 }
