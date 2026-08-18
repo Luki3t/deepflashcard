@@ -47,6 +47,23 @@ class ReviewsRepository {
             .get();
     return rows.map((r) => r.cardId).toSet().length;
   }
+
+  // Cards logged with previousInterval > 0 had already been studied before
+  // (they were due for review, not brand-new), so this counts review cards
+  // studied on the given date — used to enforce the daily review cap.
+  Future<int> countDueCardsReviewed(DateTime date) async {
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+    final rows =
+        await (_db.select(_db.reviewLogs)..where(
+              (r) =>
+                  r.reviewedAt.isBiggerOrEqualValue(start) &
+                  r.reviewedAt.isSmallerThanValue(end) &
+                  r.previousInterval.isBiggerThanValue(0),
+            ))
+            .get();
+    return rows.map((r) => r.cardId).toSet().length;
+  }
 }
 
 final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {

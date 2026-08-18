@@ -309,23 +309,44 @@ class _StudySection extends ConsumerStatefulWidget {
 }
 
 class _StudySectionState extends ConsumerState<_StudySection> {
-  late final TextEditingController _ctrl;
+  late final TextEditingController _newCardsCtrl;
+  late final TextEditingController _reviewsCtrl;
 
   @override
   void initState() {
     super.initState();
-    final current =
-        ref
-            .read(sharedPreferencesProvider)
-            .getInt(AppConstants.maxNewCardsPerDayKey) ??
+    final prefs = ref.read(sharedPreferencesProvider);
+    final currentNew =
+        prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
         AppConstants.defaultMaxNewCardsPerDay;
-    _ctrl = TextEditingController(text: '$current');
+    final currentReviews =
+        prefs.getInt(AppConstants.maxReviewsPerDayKey) ??
+        AppConstants.defaultMaxReviewsPerDay;
+    _newCardsCtrl = TextEditingController(text: '$currentNew');
+    _reviewsCtrl = TextEditingController(text: '$currentReviews');
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _newCardsCtrl.dispose();
+    _reviewsCtrl.dispose();
     super.dispose();
+  }
+
+  void _showInfoDialog(String title, String message) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -346,11 +367,27 @@ class _StudySectionState extends ConsumerState<_StudySection> {
           },
         ),
         ListTile(
-          title: const Text('Max new cards per day'),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Max new cards per day'),
+              IconButton(
+                icon: const Icon(Icons.info_outline, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showInfoDialog(
+                  'Max new cards per day',
+                  "Caps how many cards you've never studied before get "
+                      'introduced each day. Cards you have already studied '
+                      "and are due for review don't count against this "
+                      'limit — see "Max reviews per day" for those.',
+                ),
+              ),
+            ],
+          ),
           trailing: SizedBox(
             width: 64,
             child: TextField(
-              controller: _ctrl,
+              controller: _newCardsCtrl,
               textAlign: TextAlign.center,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
@@ -363,6 +400,46 @@ class _StudySectionState extends ConsumerState<_StudySection> {
                   ref
                       .read(sharedPreferencesProvider)
                       .setInt(AppConstants.maxNewCardsPerDayKey, n);
+                }
+              },
+            ),
+          ),
+        ),
+        ListTile(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Max reviews per day'),
+              IconButton(
+                icon: const Icon(Icons.info_outline, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showInfoDialog(
+                  'Max reviews per day',
+                  'Caps how many due cards — cards you have already '
+                      'studied before and that came back up for review — '
+                      "you study each day. Brand-new cards don't count "
+                      'against this limit — see "Max new cards per day" '
+                      'for those.',
+                ),
+              ),
+            ],
+          ),
+          trailing: SizedBox(
+            width: 64,
+            child: TextField(
+              controller: _reviewsCtrl,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (v) {
+                final n = int.tryParse(v);
+                if (n != null && n > 0) {
+                  ref
+                      .read(sharedPreferencesProvider)
+                      .setInt(AppConstants.maxReviewsPerDayKey, n);
                 }
               },
             ),

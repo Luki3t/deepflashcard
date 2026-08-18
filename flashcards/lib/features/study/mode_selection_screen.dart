@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/providers/shared_preferences_provider.dart';
+import '../decks/deck_providers.dart';
 
 enum StudyMode { flip, choice, typing }
 
@@ -87,6 +88,8 @@ class _ModeSelectionScreenState extends ConsumerState<ModeSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _SourceLabel(deckId: widget.deckId),
+            const SizedBox(height: 12),
             Text(
               'How do you want to study?',
               style: Theme.of(context).textTheme.titleMedium,
@@ -112,6 +115,32 @@ class _ModeSelectionScreenState extends ConsumerState<ModeSelectionScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SourceLabel extends ConsumerWidget {
+  const _SourceLabel({required this.deckId});
+  final int? deckId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = Theme.of(context).colorScheme;
+    final text = deckId == null
+        ? 'Source: All decks'
+        : 'Source: ${ref.watch(watchDeckProvider(deckId!)).value?.name ?? '…'}';
+
+    return Row(
+      children: [
+        Icon(Icons.style_outlined, size: 16, color: color.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: color.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }

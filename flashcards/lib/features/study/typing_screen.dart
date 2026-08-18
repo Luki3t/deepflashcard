@@ -27,7 +27,8 @@ class TypingScreen extends ConsumerWidget {
             stats: session.stats,
             deckId: deckId,
             totalCards: session.cards.length,
-            dailyLimitReached: session.dailyLimitReached,
+            newCardLimitReached: session.newCardLimitReached,
+            reviewLimitReached: session.reviewLimitReached,
           );
         }
         return _TypingView(session: session, deckId: deckId);
@@ -323,12 +324,14 @@ class _SummaryScreen extends ConsumerWidget {
     required this.stats,
     required this.deckId,
     required this.totalCards,
-    required this.dailyLimitReached,
+    required this.newCardLimitReached,
+    required this.reviewLimitReached,
   });
   final SessionStats stats;
   final int? deckId;
   final int totalCards;
-  final bool dailyLimitReached;
+  final bool newCardLimitReached;
+  final bool reviewLimitReached;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -336,6 +339,10 @@ class _SummaryScreen extends ConsumerWidget {
     final maxNew =
         prefs.getInt(AppConstants.maxNewCardsPerDayKey) ??
         AppConstants.defaultMaxNewCardsPerDay;
+    final maxReviews =
+        prefs.getInt(AppConstants.maxReviewsPerDayKey) ??
+        AppConstants.defaultMaxReviewsPerDay;
+    final anyLimitReached = newCardLimitReached || reviewLimitReached;
 
     return Scaffold(
       body: SafeArea(
@@ -354,7 +361,7 @@ class _SummaryScreen extends ConsumerWidget {
                 Text(
                   totalCards > 0
                       ? 'Session complete!'
-                      : dailyLimitReached
+                      : anyLimitReached
                       ? 'Daily limit reached'
                       : 'Nothing to study!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -377,7 +384,11 @@ class _SummaryScreen extends ConsumerWidget {
                   ),
                 ] else
                   Text(
-                    dailyLimitReached
+                    newCardLimitReached && reviewLimitReached
+                        ? "You've reached today's review and new-word limits."
+                        : reviewLimitReached
+                        ? "You've reached today's review limit."
+                        : newCardLimitReached
                         ? "You've reached today's new-word limit."
                         : 'No cards are due right now. Come back later!',
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -392,17 +403,31 @@ class _SummaryScreen extends ConsumerWidget {
                     child: const Text('Learn More'),
                   ),
                   const SizedBox(height: 12),
-                ] else if (dailyLimitReached) ...[
-                  OutlinedButton(
-                    onPressed: () {
-                      ref
-                          .read(extraNewCardBudgetProvider.notifier)
-                          .addBatch(maxNew);
-                      ref.invalidate(studySessionProvider(deckId));
-                    },
-                    child: Text('Study $maxNew More'),
-                  ),
-                  const SizedBox(height: 12),
+                ] else if (anyLimitReached) ...[
+                  if (reviewLimitReached) ...[
+                    OutlinedButton(
+                      onPressed: () {
+                        ref
+                            .read(extraReviewBudgetProvider.notifier)
+                            .addBatch(maxReviews);
+                        ref.invalidate(studySessionProvider(deckId));
+                      },
+                      child: Text('Review $maxReviews More'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (newCardLimitReached) ...[
+                    OutlinedButton(
+                      onPressed: () {
+                        ref
+                            .read(extraNewCardBudgetProvider.notifier)
+                            .addBatch(maxNew);
+                        ref.invalidate(studySessionProvider(deckId));
+                      },
+                      child: Text('Study $maxNew More New'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ],
                 TextButton(
                   onPressed: () {
