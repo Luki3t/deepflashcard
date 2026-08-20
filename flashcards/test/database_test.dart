@@ -35,7 +35,10 @@ void main() {
 
   tearDown(() => db.close());
 
-  test('create deck → add card → query due cards', () async {
+  test('brand-new card (repetitions=0) is not returned by getDueCards',
+      () async {
+    // getDueCards backs the "review" queue; brand-new cards are handled
+    // separately by the new-card-per-day budget in StudySessionNotifier.
     final now = DateTime.now();
 
     final deckId = await decks.createDeck(DecksCompanion.insert(
@@ -53,6 +56,39 @@ void main() {
       createdAt: now,
       nextReview: now,
     ));
+
+    final due = await cards.getDueCards(deckId, now);
+    expect(due, isEmpty);
+  });
+
+  test('card already reviewed once (repetitions>0) is due when nextReview '
+      'has passed', () async {
+    final now = DateTime.now();
+
+    final deckId = await decks.createDeck(DecksCompanion.insert(
+      name: 'Test Deck',
+      sourceLanguage: 'pl',
+      targetLanguage: 'en',
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final cardId = await cards.createCard(CardsCompanion.insert(
+      deckId: deckId,
+      sourceText: 'kot',
+      targetText: 'cat',
+      createdAt: now,
+      nextReview: now,
+    ));
+
+    await cards.updateCardSrs(
+      id: cardId,
+      easeFactor: 2.5,
+      intervalDays: 1,
+      repetitions: 1,
+      nextReview: now.subtract(const Duration(minutes: 1)),
+      lastReviewed: now,
+    );
 
     final due = await cards.getDueCards(deckId, now);
     expect(due.length, 1);
