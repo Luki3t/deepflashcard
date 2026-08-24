@@ -39,7 +39,7 @@ class AboutScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      info?.appName ?? 'DeepFlashcard',
+                      info?.appName ?? 'Deep Flashcard',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 4),

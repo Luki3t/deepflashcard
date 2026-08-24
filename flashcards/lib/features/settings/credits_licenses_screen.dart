@@ -72,7 +72,7 @@ class CreditsLicensesScreen extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => showLicensePage(
                   context: context,
-                  applicationName: info?.appName ?? 'DeepFlashcard',
+                  applicationName: info?.appName ?? 'Deep Flashcard',
                   applicationVersion: info?.version,
                 ),
               );

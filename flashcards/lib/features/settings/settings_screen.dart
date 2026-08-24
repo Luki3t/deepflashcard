@@ -587,7 +587,7 @@ class _AboutSection extends StatelessWidget {
         const _SectionHeader('About'),
         ListTile(
           leading: const Icon(Icons.info_outline),
-          title: const Text('About DeepFlashcard'),
+          title: const Text('About Deep Flashcard'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/about'),
         ),

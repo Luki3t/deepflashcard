@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
-        android:label="DFlashcard"
+        android:label="Deep Flashcard"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false">

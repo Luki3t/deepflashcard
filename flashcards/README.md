@@ -1,4 +1,4 @@
-# DeepFlashcard
+# Deep Flashcard
 
 A language-learning flashcard app built with Flutter. Spaced repetition (SM-2),
 on-device translation, pronunciation, and example sentences — everything runs
