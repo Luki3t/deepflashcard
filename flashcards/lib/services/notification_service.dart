@@ -72,7 +72,7 @@ class NotificationService {
     try {
       await _plugin.zonedSchedule(
         id: _notificationId,
-        title: 'Flashcards',
+        title: 'Deep Flashcard',
         body: message,
         scheduledDate: _nextInstanceOf(time.hour, time.minute),
         notificationDetails: NotificationDetails(

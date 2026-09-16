@@ -74,7 +74,7 @@ class _FlashcardsAppState extends ConsumerState<FlashcardsApp> {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Flashcards',
+      title: 'Deep Flashcard',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,

@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Should show welcome screen
-    expect(find.text('Flashcards'), findsWidgets);
+    expect(find.text('Deep Flashcard'), findsWidgets);
     expect(find.text('Get Started'), findsOneWidget);
 
     await db.close();
