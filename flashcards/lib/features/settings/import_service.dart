@@ -15,6 +15,14 @@ class ParsedCsvCard {
   final String sourceText;
   final String targetText;
   final String? notes;
+
+  /// The same card with the two text columns exchanged, for files whose
+  /// columns are in the reverse of the expected order.
+  ParsedCsvCard get swapped => ParsedCsvCard(
+    sourceText: targetText,
+    targetText: sourceText,
+    notes: notes,
+  );
 }
 
 class CsvParseResult {

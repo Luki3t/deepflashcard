@@ -89,10 +89,20 @@ class LanguageSelectionScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 8, 32, 24),
               child: FilledButton(
-                onPressed: () => context.push(
-                  isNative ? '/onboarding/target' : '/onboarding/confirm',
-                ),
-                child: Text(isNative ? 'Next' : 'Next'),
+                onPressed: () {
+                  if (isNative && selectedCode == otherCode) {
+                    // The target still holds the default the user hasn't seen
+                    // yet; move it off the native language so the next screen
+                    // can't hand back a same-language pair.
+                    ref
+                        .read(pendingTargetCodeProvider.notifier)
+                        .set(firstLanguageOtherThan(selectedCode));
+                  }
+                  context.push(
+                    isNative ? '/onboarding/target' : '/onboarding/confirm',
+                  );
+                },
+                child: const Text('Next'),
               ),
             ),
           ],

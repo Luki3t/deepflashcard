@@ -182,4 +182,23 @@ void main() {
       expect(result.errors[1].line, 5);
     });
   });
+
+  group('swapped columns', () {
+    test('exchanges the two texts and keeps the notes', () {
+      const card = ParsedCsvCard(
+        sourceText: 'kot',
+        targetText: 'cat',
+        notes: 'animal',
+      );
+      expect(card.swapped.sourceText, 'cat');
+      expect(card.swapped.targetText, 'kot');
+      expect(card.swapped.notes, 'animal');
+    });
+
+    test('swapping twice returns the original mapping', () {
+      const card = ParsedCsvCard(sourceText: 'kot', targetText: 'cat');
+      expect(card.swapped.swapped.sourceText, 'kot');
+      expect(card.swapped.swapped.targetText, 'cat');
+    });
+  });
 }

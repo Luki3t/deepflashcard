@@ -116,4 +116,43 @@ void main() {
       await db.close();
     },
   );
+
+  testWidgets(
+    'picking the default target language as the native one moves the target '
+    'off it instead of creating a same-language deck',
+    (tester) async {
+      final (prefs, db) = await pumpApp(tester);
+
+      await tester.tap(find.text('Get Started'));
+      await tester.pumpAndSettle();
+
+      // The target defaults to Polish; pick Polish as the native language too.
+      expect(find.text('What is your native language?'), findsOneWidget);
+      await tester.tap(find.text('Polish'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+
+      // The target screen has moved off Polish, which is now disabled there.
+      expect(find.text('What do you want to learn?'), findsOneWidget);
+      final polishTile = tester.widget<ListTile>(
+        find.ancestor(of: find.text('Polish'), matching: find.byType(ListTile)),
+      );
+      expect(polishTile.enabled, isFalse);
+
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Learning'));
+      await tester.pumpAndSettle();
+
+      expect(prefs.getString('native_language_code'), 'pl');
+      expect(prefs.getString('target_language_code'), isNot('pl'));
+
+      final deck = await db.select(db.decks).getSingle();
+      expect(deck.sourceLanguage, 'pl');
+      expect(deck.targetLanguage, isNot('pl'));
+
+      await db.close();
+    },
+  );
 }

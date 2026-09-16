@@ -254,6 +254,7 @@ class _LanguagesSection extends ConsumerWidget {
           subtitle: const Text('Default source for new decks'),
           trailing: _LangDropdown(
             value: prefs.nativeCode,
+            disabledCode: prefs.targetCode,
             onChanged: (code) => ref
                 .read(languagePreferencesProvider.notifier)
                 .save(code, prefs.targetCode),
@@ -264,6 +265,7 @@ class _LanguagesSection extends ConsumerWidget {
           subtitle: const Text('Default target for new decks'),
           trailing: _LangDropdown(
             value: prefs.targetCode,
+            disabledCode: prefs.nativeCode,
             onChanged: (code) => ref
                 .read(languagePreferencesProvider.notifier)
                 .save(prefs.nativeCode, code),
@@ -275,8 +277,16 @@ class _LanguagesSection extends ConsumerWidget {
 }
 
 class _LangDropdown extends StatelessWidget {
-  const _LangDropdown({required this.value, required this.onChanged});
+  const _LangDropdown({
+    required this.value,
+    required this.onChanged,
+    this.disabledCode,
+  });
   final String value;
+
+  /// Language held by the other side of the pair: greyed out and unselectable,
+  /// so the native and learning languages can never be the same.
+  final String? disabledCode;
   final void Function(String) onChanged;
 
   @override
@@ -284,16 +294,21 @@ class _LangDropdown extends StatelessWidget {
     return DropdownButton<String>(
       value: value,
       underline: const SizedBox.shrink(),
-      items: supportedLanguages
-          .map(
-            (l) => DropdownMenuItem(
-              value: l.code,
-              child: Text('${l.flag} ${l.name}'),
-            ),
-          )
-          .toList(),
+      items: supportedLanguages.map((l) {
+        final disabled = l.code == disabledCode;
+        return DropdownMenuItem(
+          value: l.code,
+          enabled: !disabled,
+          child: Text(
+            '${l.flag} ${l.name}',
+            style: disabled
+                ? TextStyle(color: Theme.of(context).disabledColor)
+                : null,
+          ),
+        );
+      }).toList(),
       onChanged: (v) {
-        if (v != null) onChanged(v);
+        if (v != null && v != disabledCode) onChanged(v);
       },
     );
   }

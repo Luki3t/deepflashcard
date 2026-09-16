@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/app_database.dart';
@@ -20,8 +21,23 @@ class DecksRepository {
   Future<int> createDeck(DecksCompanion deck) =>
       _db.into(_db.decks).insert(deck);
 
-  Future<bool> updateDeck(DecksCompanion deck) =>
-      _db.update(_db.decks).replace(deck);
+  /// Updates a deck's editable fields. The source and target languages are
+  /// fixed when the deck is created — changing them would relabel every card
+  /// already in the deck — so they are deliberately not updatable here.
+  Future<void> updateDeckDetails({
+    required int id,
+    required String name,
+    required String? description,
+    required DateTime updatedAt,
+  }) async {
+    await (_db.update(_db.decks)..where((d) => d.id.equals(id))).write(
+      DecksCompanion(
+        name: Value(name),
+        description: Value(description),
+        updatedAt: Value(updatedAt),
+      ),
+    );
+  }
 
   Future<int> deleteDeck(int id) =>
       (_db.delete(_db.decks)..where((d) => d.id.equals(id))).go();

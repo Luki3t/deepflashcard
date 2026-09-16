@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/widgets/language_dropdown.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../onboarding/language_preferences_provider.dart';
@@ -188,7 +189,9 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
     super.initState();
     final prefs = ref.read(languagePreferencesProvider);
     _sourceCode = prefs.nativeCode;
-    _targetCode = prefs.targetCode;
+    _targetCode = prefs.targetCode == _sourceCode
+        ? firstLanguageOtherThan(_sourceCode)
+        : prefs.targetCode;
   }
 
   @override
@@ -258,17 +261,19 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
           Row(
             children: [
               Expanded(
-                child: _LanguageDropdown(
+                child: LanguageDropdown(
                   label: 'Native (I speak)',
                   value: _sourceCode,
+                  disabledCode: _targetCode,
                   onChanged: (v) => setState(() => _sourceCode = v),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _LanguageDropdown(
+                child: LanguageDropdown(
                   label: 'Learning',
                   value: _targetCode,
+                  disabledCode: _sourceCode,
                   onChanged: (v) => setState(() => _targetCode = v),
                 ),
               ),
@@ -289,44 +294,6 @@ class _CreateDeckSheetState extends ConsumerState<_CreateDeckSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _LanguageDropdown extends StatelessWidget {
-  const _LanguageDropdown({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      items: supportedLanguages
-          .map(
-            (l) => DropdownMenuItem(
-              value: l.code,
-              child: Text(
-                '${l.flag} ${l.name}',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
     );
   }
 }

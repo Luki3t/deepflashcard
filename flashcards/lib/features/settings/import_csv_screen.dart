@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/widgets/language_dropdown.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/cards_repository.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../decks/deck_providers.dart';
 import '../onboarding/language_preferences_provider.dart';
+import 'import_preview_table.dart';
 import 'import_service.dart';
 
 enum _Step { pick, configure, importing, done }
@@ -30,6 +32,10 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
   String? _pickError;
   String _separator = ',';
 
+  /// When true the file's first column holds the target text and the second
+  /// the source text, i.e. the reverse of the expected order.
+  bool _swapColumns = false;
+
   // Deck target selection
   bool _createNewDeck = false;
   int? _selectedDeckId;
@@ -45,7 +51,24 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
     super.initState();
     final prefs = ref.read(languagePreferencesProvider);
     _newDeckSource = prefs.nativeCode;
-    _newDeckTarget = prefs.targetCode;
+    _newDeckTarget = prefs.targetCode == _newDeckSource
+        ? firstLanguageOtherThan(_newDeckSource)
+        : prefs.targetCode;
+  }
+
+  /// [rows] as they will be stored, honouring the swap-columns switch.
+  List<ParsedCsvCard> _effectiveRows(List<ParsedCsvCard> rows) =>
+      _swapColumns ? rows.map((r) => r.swapped).toList() : rows;
+
+  /// Languages the cards will land in, or null while no deck is chosen yet.
+  (String, String)? _destinationLanguages(List<Deck> decks) {
+    if (_createNewDeck) return (_newDeckSource, _newDeckTarget);
+    final id = _selectedDeckId;
+    if (id == null) return null;
+    for (final deck in decks) {
+      if (deck.id == id) return (deck.sourceLanguage, deck.targetLanguage);
+    }
+    return null;
   }
 
   @override
@@ -121,16 +144,18 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
       deckId = _selectedDeckId!;
     }
 
+    final rows = _effectiveRows(parsed.rows);
+
     setState(() {
       _step = _Step.importing;
       _importedCount = 0;
-      _importTotal = parsed.rows.length;
+      _importTotal = rows.length;
     });
 
     const batchSize = 100;
     final now = DateTime.now();
-    for (var i = 0; i < parsed.rows.length; i += batchSize) {
-      final chunk = parsed.rows.skip(i).take(batchSize).map((row) {
+    for (var i = 0; i < rows.length; i += batchSize) {
+      final chunk = rows.skip(i).take(batchSize).map((row) {
         return CardsCompanion.insert(
           deckId: deckId,
           sourceText: row.sourceText,
@@ -161,6 +186,7 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
       _parseResult = null;
       _pickError = null;
       _separator = ',';
+      _swapColumns = false;
       _createNewDeck = false;
       _selectedDeckId = null;
       _newDeckNameCtrl.clear();
@@ -231,7 +257,7 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
   Widget _buildConfigureStep(BuildContext context) {
     final parsed = _parseResult!;
     final decksAsync = ref.watch(watchAllDecksProvider);
-    final previewRows = parsed.rows.take(5).toList();
+    final previewRows = _effectiveRows(parsed.rows.take(5).toList());
 
     final canImport =
         parsed.rows.isNotEmpty &&
@@ -300,27 +326,6 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
             ),
           ),
         ],
-        if (previewRows.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text('Preview', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: previewRows
-                  .map(
-                    (r) => ListTile(
-                      dense: true,
-                      title: Text(r.sourceText),
-                      subtitle: Text(r.targetText),
-                      trailing: r.notes != null
-                          ? const Icon(Icons.note_outlined, size: 18)
-                          : null,
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
         const SizedBox(height: 24),
         Text('Import into', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -346,17 +351,19 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
           Row(
             children: [
               Expanded(
-                child: _LanguageDropdown(
+                child: LanguageDropdown(
                   label: 'Source',
                   value: _newDeckSource,
+                  disabledCode: _newDeckTarget,
                   onChanged: (v) => setState(() => _newDeckSource = v),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _LanguageDropdown(
+                child: LanguageDropdown(
                   label: 'Target',
                   value: _newDeckTarget,
+                  disabledCode: _newDeckSource,
                   onChanged: (v) => setState(() => _newDeckTarget = v),
                 ),
               ),
@@ -377,7 +384,9 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
                           (d) => DropdownMenuItem(
                             value: d.id,
                             child: Text(
-                              d.name,
+                              '${d.name}  '
+                              '${languageFlag(d.sourceLanguage)}→'
+                              '${languageFlag(d.targetLanguage)}',
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -388,6 +397,31 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text('Error: $e'),
           ),
+        if (previewRows.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('Preview', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            'Check that each column landed in the right language.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ImportPreviewTable(
+            rows: previewRows,
+            languages: _destinationLanguages(decksAsync.value ?? const []),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _swapColumns,
+            onChanged: (v) => setState(() => _swapColumns = v),
+            title: const Text('Swap columns'),
+            subtitle: const Text(
+              'Use the first column as the target and the second as the source',
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         FilledButton(
           onPressed: canImport ? _import : null,
@@ -449,44 +483,6 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _LanguageDropdown extends StatelessWidget {
-  const _LanguageDropdown({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      items: supportedLanguages
-          .map(
-            (l) => DropdownMenuItem(
-              value: l.code,
-              child: Text(
-                '${l.flag} ${l.name}',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
     );
   }
 }

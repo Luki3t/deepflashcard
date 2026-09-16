@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -338,8 +337,6 @@ class _EditDeckSheet extends ConsumerStatefulWidget {
 class _EditDeckSheetState extends ConsumerState<_EditDeckSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _descController;
-  late String _sourceCode;
-  late String _targetCode;
   bool _saving = false;
 
   @override
@@ -349,8 +346,6 @@ class _EditDeckSheetState extends ConsumerState<_EditDeckSheet> {
     _descController = TextEditingController(
       text: widget.deck.description ?? '',
     );
-    _sourceCode = widget.deck.sourceLanguage;
-    _targetCode = widget.deck.targetLanguage;
   }
 
   @override
@@ -365,22 +360,14 @@ class _EditDeckSheetState extends ConsumerState<_EditDeckSheet> {
     if (name.isEmpty || _saving) return;
     setState(() => _saving = true);
 
-    final now = DateTime.now();
+    final description = _descController.text.trim();
     await ref
         .read(decksRepositoryProvider)
-        .updateDeck(
-          DecksCompanion(
-            id: Value(widget.deck.id),
-            name: Value(name),
-            description: Value(
-              _descController.text.trim().isEmpty
-                  ? null
-                  : _descController.text.trim(),
-            ),
-            sourceLanguage: Value(_sourceCode),
-            targetLanguage: Value(_targetCode),
-            updatedAt: Value(now),
-          ),
+        .updateDeckDetails(
+          id: widget.deck.id,
+          name: name,
+          description: description.isEmpty ? null : description,
+          updatedAt: DateTime.now(),
         );
     if (mounted) Navigator.of(context).pop();
   }
@@ -418,25 +405,28 @@ class _EditDeckSheetState extends ConsumerState<_EditDeckSheet> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _LanguageDropdown(
-                  label: 'Source',
-                  value: _sourceCode,
-                  onChanged: (v) => setState(() => _sourceCode = v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _LanguageDropdown(
-                  label: 'Target',
-                  value: _targetCode,
-                  onChanged: (v) => setState(() => _targetCode = v),
-                ),
-              ),
-            ],
+          const SizedBox(height: 16),
+          Text(
+            'Languages',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${languageFlag(widget.deck.sourceLanguage)} '
+            '${languageName(widget.deck.sourceLanguage)}'
+            '  →  '
+            '${languageFlag(widget.deck.targetLanguage)} '
+            '${languageName(widget.deck.targetLanguage)}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Languages are set when the deck is created and cannot be changed.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 20),
           FilledButton(
@@ -453,44 +443,6 @@ class _EditDeckSheetState extends ConsumerState<_EditDeckSheet> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _LanguageDropdown extends StatelessWidget {
-  const _LanguageDropdown({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final void Function(String) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      items: supportedLanguages
-          .map(
-            (l) => DropdownMenuItem(
-              value: l.code,
-              child: Text(
-                '${l.flag} ${l.name}',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
     );
   }
 }

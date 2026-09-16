@@ -38,3 +38,8 @@ AppLanguage languageByCode(String code) => supportedLanguages.firstWhere(
 
 String languageName(String code) => languageByCode(code).name;
 String languageFlag(String code) => languageByCode(code).flag;
+
+/// The first supported language whose code differs from [code]. Used to move a
+/// language pair off a collision, since a deck's source and target must differ.
+String firstLanguageOtherThan(String code) =>
+    supportedLanguages.firstWhere((l) => l.code != code).code;
