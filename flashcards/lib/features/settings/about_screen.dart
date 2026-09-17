@@ -20,21 +20,13 @@ class AboutScreen extends StatelessWidget {
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'F',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    // The launcher icon itself, so this never drifts from it.
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/icon/icon.png',
+                        width: 72,
+                        height: 72,
                       ),
                     ),
                     const SizedBox(height: 12),

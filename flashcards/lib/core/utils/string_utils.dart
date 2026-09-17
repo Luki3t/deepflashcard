@@ -42,3 +42,7 @@ double similarity(String a, String b) {
   if (maxLen == 0) return 1.0;
   return 1.0 - levenshtein(na, nb) / maxLen;
 }
+
+/// "1 card", "2 cards" — [plural] defaults to [singular] + "s".
+String countLabel(int count, String singular, [String? plural]) =>
+    '$count ${count == 1 ? singular : plural ?? '${singular}s'}';

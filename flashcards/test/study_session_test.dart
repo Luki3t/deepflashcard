@@ -11,6 +11,7 @@ import 'package:flashcards/core/constants/app_constants.dart';
 import 'package:flashcards/core/providers/shared_preferences_provider.dart';
 import 'package:flashcards/data/database/app_database.dart';
 import 'package:flashcards/data/database/database_provider.dart';
+import 'package:flashcards/data/database/flash_card_status.dart';
 import 'package:flashcards/data/repositories/cards_repository.dart';
 import 'package:flashcards/data/repositories/decks_repository.dart';
 import 'package:flashcards/data/repositories/reviews_repository.dart';
@@ -186,4 +187,88 @@ void main() {
     expect(state.cards.length, 2);
     expect(state.reviewLimitReached, isTrue);
   });
+
+  // Regression: a failed card (rating < 3) got repetitions=0 / interval=1,
+  // which neither the due query (repetitions > 0) nor the new-card filter
+  // (intervalDays == 0) matched — so it never came back.
+  test('a card rated Again is no longer new and comes back once due', () async {
+    final cardId = await addNewCard('-again');
+    await makeContainer();
+    final sub = container.listen(studySessionProvider(deckId), (_, _) {});
+    addTearDown(sub.close);
+
+    await container.read(studySessionProvider(deckId).future);
+    await container.read(studySessionProvider(deckId).notifier).submitRating(0);
+
+    final card = (await cards.getCardById(cardId))!;
+    expect(card.repetitions, 0);
+    expect(card.intervalDays, 1);
+    expect(card.isNew, isFalse);
+
+    final now = DateTime.now();
+    expect(card.isDue(now), isFalse);
+    final tomorrow = now.add(const Duration(days: 1, minutes: 1));
+    expect(card.isDue(tomorrow), isTrue);
+    expect(
+      (await cards.getDueCards(deckId, tomorrow)).map((c) => c.id),
+      contains(cardId),
+    );
+    expect(
+      (await cards.getAllDueCards(tomorrow)).map((c) => c.id),
+      contains(cardId),
+    );
+  });
+
+  test(
+    'a failed card that is due again is studied as a review, not new',
+    () async {
+      final now = DateTime.now();
+      final cardId = await addNewCard('-lapsed');
+      await cards.updateCardSrs(
+        id: cardId,
+        easeFactor: 1.7,
+        intervalDays: 1,
+        repetitions: 0,
+        nextReview: now.subtract(const Duration(minutes: 1)),
+        lastReviewed: now.subtract(const Duration(days: 1)),
+      );
+      // No new-card budget at all: the card must still be offered as a review.
+      await makeContainer(prefsValues: {AppConstants.maxNewCardsPerDayKey: 0});
+
+      final state = await container.read(studySessionProvider(deckId).future);
+
+      expect(state.cards.map((c) => c.id), [cardId]);
+    },
+  );
+
+  // Regression: the provider wasn't autoDispose, so re-entering study showed
+  // the previous session's summary even after new cards had been added.
+  test(
+    'leaving a finished session drops it, so re-entering starts fresh',
+    () async {
+      await addNewCard('-first');
+      await makeContainer();
+
+      var sub = container.listen(studySessionProvider(deckId), (_, _) {});
+      await container.read(studySessionProvider(deckId).future);
+      await container
+          .read(studySessionProvider(deckId).notifier)
+          .submitRating(4);
+      expect(
+        container.read(studySessionProvider(deckId)).value!.finished,
+        isTrue,
+      );
+
+      sub.close();
+      await container.pump();
+
+      await addNewCard('-added-later');
+      sub = container.listen(studySessionProvider(deckId), (_, _) {});
+      addTearDown(sub.close);
+      final state = await container.read(studySessionProvider(deckId).future);
+
+      expect(state.finished, isFalse);
+      expect(state.cards.map((c) => c.sourceText), ['word-added-later']);
+    },
+  );
 }

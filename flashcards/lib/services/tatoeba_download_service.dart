@@ -50,15 +50,23 @@ class TatoebaManifest {
 }
 
 class TatoebaDownloadService {
-  final _dio = Dio();
+  // Without timeouts an unreachable server leaves the UI spinning for minutes.
+  final _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
+    ),
+  );
 
-  Future<TatoebaManifest> fetchManifest() async {
+  /// [forceRefresh] skips the 24 h cache, but a failed refresh still falls
+  /// back to the cached manifest rather than leaving the user with nothing.
+  Future<TatoebaManifest> fetchManifest({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_cacheKey);
     final cacheTime = prefs.getInt(_cacheTimeKey) ?? 0;
     final age = DateTime.now().millisecondsSinceEpoch - cacheTime;
 
-    if (cached != null && age < _cacheMaxAgeMs) {
+    if (!forceRefresh && cached != null && age < _cacheMaxAgeMs) {
       try {
         return TatoebaManifest.fromJson(
           jsonDecode(cached) as Map<String, dynamic>,
@@ -66,20 +74,28 @@ class TatoebaDownloadService {
       } catch (_) {}
     }
 
-    final response = await _dio.get<String>(
-      _manifestUrl,
-      options: Options(responseType: ResponseType.plain),
-    );
+    final Response<String> response;
+    try {
+      response = await _dio.get<String>(
+        _manifestUrl,
+        options: Options(responseType: ResponseType.plain),
+      );
+    } on DioException {
+      // Offline: an outdated manifest is still good enough to list the packs
+      // (and to show which ones are already downloaded).
+      if (cached != null) {
+        try {
+          return TatoebaManifest.fromJson(
+            jsonDecode(cached) as Map<String, dynamic>,
+          );
+        } catch (_) {}
+      }
+      rethrow;
+    }
     final data = response.data!;
     await prefs.setString(_cacheKey, data);
     await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
     return TatoebaManifest.fromJson(jsonDecode(data) as Map<String, dynamic>);
-  }
-
-  Future<void> invalidateManifestCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_cacheKey);
-    await prefs.remove(_cacheTimeKey);
   }
 
   Future<void> downloadPair(

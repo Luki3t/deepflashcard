@@ -30,13 +30,13 @@ class CardsRepository {
 
   Future<List<FlashCard>> getAllCards() => _db.select(_db.cards).get();
 
-  Future<List<FlashCard>> getAllDueCards(DateTime now) => (_db.select(
-    _db.cards,
-  )..where(
-      (c) =>
-          c.nextReview.isSmallerOrEqualValue(now) &
-          c.repetitions.isBiggerThanValue(0),
-    )).get();
+  Future<List<FlashCard>> getAllDueCards(DateTime now) =>
+      (_db.select(_db.cards)..where(
+            (c) =>
+                c.nextReview.isSmallerOrEqualValue(now) &
+                c.intervalDays.isBiggerThanValue(0),
+          ))
+          .get();
 
   Future<void> updateCardSrs({
     required int id,
@@ -81,7 +81,7 @@ class CardsRepository {
             (c) =>
                 c.deckId.equals(deckId) &
                 c.nextReview.isSmallerOrEqualValue(now) &
-                c.repetitions.isBiggerThanValue(0),
+                c.intervalDays.isBiggerThanValue(0),
           ))
           .get();
 }

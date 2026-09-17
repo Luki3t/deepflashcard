@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/utils/string_utils.dart';
 import 'stats_providers.dart';
 
 class StatsScreen extends ConsumerWidget {
@@ -250,7 +251,8 @@ class _Heatmap extends StatelessWidget {
         itemBuilder: (_, i) {
           final count = activityMap[days[i]] ?? 0;
           return Tooltip(
-            message: '${days[i].day}/${days[i].month}: $count reviews',
+            message:
+                '${days[i].day}/${days[i].month}: ${countLabel(count, 'review')}',
             child: Container(
               decoration: BoxDecoration(
                 color: colorFor(count),

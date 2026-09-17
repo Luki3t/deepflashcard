@@ -2,14 +2,15 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/shared_preferences_provider.dart';
+import '../../core/utils/string_utils.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../../services/tts_service.dart';
 import 'srs_algorithm.dart';
+import 'study_navigation.dart';
 import 'study_session_notifier.dart';
 
 class StudyScreen extends ConsumerWidget {
@@ -483,7 +484,7 @@ class _SummaryScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 if (stats.reviewed > 0) ...[
                   Text(
-                    '${stats.reviewed} cards reviewed',
+                    '${countLabel(stats.reviewed, 'card')} reviewed',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -541,13 +542,7 @@ class _SummaryScreen extends ConsumerWidget {
                   ],
                 ],
                 TextButton(
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
+                  onPressed: () => leaveStudySession(context, deckId),
                   child: Text(
                     deckId != null ? 'Back to Deck' : 'Back to Decks',
                   ),

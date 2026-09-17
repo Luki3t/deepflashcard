@@ -79,6 +79,7 @@ class NotificationService {
           android: AndroidNotificationDetails(
             _channelId,
             _channelName,
+            icon: 'ic_stat_notify',
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
           ),

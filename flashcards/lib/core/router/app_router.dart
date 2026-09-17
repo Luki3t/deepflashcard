@@ -18,6 +18,7 @@ import '../../features/settings/settings_screen.dart';
 import '../../features/stats/stats_screen.dart';
 import '../../features/study/mode_selection_screen.dart';
 import '../../features/study/multiple_choice_screen.dart';
+import '../../features/study/study_navigation.dart';
 import '../../features/study/study_screen.dart';
 import '../../features/study/typing_screen.dart';
 
@@ -72,14 +73,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/language-packs',
-        builder: (_, _) => const ModelDownloadScreen(),
+        builder: (_, state) => ModelDownloadScreen(
+          sourceCode: state.uri.queryParameters['source'],
+          targetCode: state.uri.queryParameters['target'],
+        ),
       ),
 
       // ── Full-screen settings ──────────────────────────────────────────
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/sentence-packs',
-        builder: (_, _) => const SentencePacksScreen(),
+        builder: (_, state) => SentencePacksScreen(
+          sourceCode: state.uri.queryParameters['source'],
+          targetCode: state.uri.queryParameters['target'],
+        ),
       ),
       GoRoute(path: '/about', builder: (_, _) => const AboutScreen()),
       GoRoute(
@@ -107,6 +114,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ── Deck detail & card routes (full-screen, no bottom nav) ────────
       GoRoute(
         path: '/decks/:id',
+        name: deckRouteName,
         builder: (_, state) =>
             DeckDetailScreen(deckId: int.parse(state.pathParameters['id']!)),
         routes: [

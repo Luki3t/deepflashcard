@@ -6,6 +6,7 @@ import '../../services/tts_service.dart';
 
 import '../../core/constants/languages.dart';
 import '../../data/database/app_database.dart';
+import '../../data/database/flash_card_status.dart';
 import '../../data/repositories/cards_repository.dart';
 import '../../data/repositories/decks_repository.dart';
 import 'deck_providers.dart';
@@ -50,10 +51,8 @@ class _DeckDetailView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cards = cardsAsync.value ?? [];
     final now = DateTime.now();
-    final dueCount = cards
-        .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
-        .length;
-    final newCount = cards.where((c) => c.repetitions == 0).length;
+    final dueCount = cards.where((c) => c.isDue(now)).length;
+    final newCount = cards.where((c) => c.isNew).length;
 
     return Scaffold(
       appBar: AppBar(

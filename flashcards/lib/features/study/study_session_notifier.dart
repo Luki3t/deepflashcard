@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/shared_preferences_provider.dart';
 import '../../data/database/app_database.dart';
+import '../../data/database/flash_card_status.dart';
 import '../../data/repositories/cards_repository.dart';
 import '../../data/repositories/reviews_repository.dart';
 import '../../data/repositories/stats_repository.dart';
@@ -123,10 +124,7 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
     final reviewLimitReached = dueCards.length < due.length;
 
     final dueIds = due.map((c) => c.id).toSet();
-    final newCandidates = all.where(
-      (c) =>
-          c.repetitions == 0 && c.intervalDays == 0 && !dueIds.contains(c.id),
-    );
+    final newCandidates = all.where((c) => c.isNew && !dueIds.contains(c.id));
     final newCards = newCandidates.take(newCardBudget).toList();
     final newCardLimitReached = newCards.length < newCandidates.length;
 
@@ -170,6 +168,9 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
           ),
         );
 
+    // The user may have left the study screen while the writes above were
+    // in flight, which disposes this autoDispose notifier.
+    if (!ref.mounted) return;
     ref.invalidate(todayProgressProvider);
     ref.invalidate(statsDataProvider);
 
@@ -186,6 +187,7 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
       final statsRepo = ref.read(statsRepositoryProvider);
       await statsRepo.updateStreak(now);
       await statsRepo.incrementTotalReviews(newStats.reviewed);
+      if (!ref.mounted) return;
     }
 
     state = AsyncData(
@@ -199,7 +201,10 @@ class StudySessionNotifier extends AsyncNotifier<StudySessionState> {
   }
 }
 
-final studySessionProvider =
-    AsyncNotifierProvider.family<StudySessionNotifier, StudySessionState, int?>(
+// autoDispose: leaving the study screen must drop the session, otherwise
+// re-entering shows the previous session's summary (or a stale
+// "Nothing to study") instead of the cards that are due now.
+final studySessionProvider = AsyncNotifierProvider.autoDispose
+    .family<StudySessionNotifier, StudySessionState, int?>(
       (deckId) => StudySessionNotifier(deckId),
     );

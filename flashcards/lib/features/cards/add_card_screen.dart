@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/languages.dart';
+import '../../data/database/app_database.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../../data/sentences/sentences_database.dart';
+import '../../services/tatoeba_download_service.dart';
 import '../../services/translator_service.dart';
 import '../../services/tts_service.dart';
 import 'card_form_controller.dart';
@@ -105,11 +107,33 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
   }
 
   Future<void> _checkTatoebaStatus(String sourceLang, String targetLang) async {
-    final db = ref.read(sentencesDatabaseProvider);
-    final downloaded =
-        await db.isPairDownloaded(sourceLang, targetLang) ||
-        await db.isPairDownloaded(targetLang, sourceLang);
+    // Examples are looked up in the deck's exact direction, so that's the
+    // pack that has to be on the device.
+    final downloaded = await ref
+        .read(sentencesDatabaseProvider)
+        .isPairDownloaded(sourceLang, targetLang);
+    if (!downloaded && !await _isTatoebaPackOffered(sourceLang, targetLang)) {
+      // Leave the status unknown so no download banner shows up: packs only
+      // exist for some pairs (all with English), and pointing the user at a
+      // pack that doesn't exist is a dead end.
+      return;
+    }
     if (mounted) setState(() => _tatoebaPackDownloaded = downloaded);
+  }
+
+  Future<bool> _isTatoebaPackOffered(
+    String sourceLang,
+    String targetLang,
+  ) async {
+    try {
+      final manifest = await ref
+          .read(tatoebaDownloadServiceProvider)
+          .fetchManifest();
+      return manifest.pairs.containsKey('$sourceLang-$targetLang');
+    } catch (_) {
+      // Offline with no cached manifest: we can't tell, so still offer it.
+      return true;
+    }
   }
 
   Future<void> _checkModelStatus(String sourceLang, String targetLang) async {
@@ -211,6 +235,24 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
     } catch (_) {
     } finally {
       if (mounted) setState(() => _isTranslatingReverse = false);
+    }
+  }
+
+  // Called on returning from a download screen: the translation models or the
+  // sentence pack may have just been downloaded, so re-check both and redo the
+  // translation and example lookup for whatever is already typed.
+  Future<void> _refreshAfterDownload(Deck deck) async {
+    await _checkModelStatus(deck.sourceLanguage, deck.targetLanguage);
+    await _checkTatoebaStatus(deck.sourceLanguage, deck.targetLanguage);
+    if (!mounted) return;
+    final source = _sourceCtrl.text;
+    final target = _targetCtrl.text;
+    if (source.trim().isNotEmpty && target.trim().isEmpty) {
+      await _autoTranslate(source);
+    } else if (source.trim().isEmpty && target.trim().isNotEmpty) {
+      await _autoTranslateReverse(target);
+    } else if (source.trim().isNotEmpty) {
+      await _loadExamples(source, deck.sourceLanguage, deck.targetLanguage);
     }
   }
 
@@ -411,12 +453,12 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => context.push('/language-packs').then((_) {
-                        _checkModelStatus(
-                          deck.sourceLanguage,
-                          deck.targetLanguage,
-                        );
-                      }),
+                      onTap: () => context
+                          .push(
+                            '/language-packs?source=${deck.sourceLanguage}'
+                            '&target=${deck.targetLanguage}',
+                          )
+                          .then((_) => _refreshAfterDownload(deck)),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -458,7 +500,8 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
                 ),
 
               // ── Tatoeba download banner ────────────────────────────────
-              if (_tatoebaPackDownloaded == false &&
+              if (deck != null &&
+                  _tatoebaPackDownloaded == false &&
                   _sourceCtrl.text.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8, bottom: 4),
@@ -467,7 +510,12 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => context.push('/sentence-packs'),
+                      onTap: () => context
+                          .push(
+                            '/sentence-packs?source=${deck.sourceLanguage}'
+                            '&target=${deck.targetLanguage}',
+                          )
+                          .then((_) => _refreshAfterDownload(deck)),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,

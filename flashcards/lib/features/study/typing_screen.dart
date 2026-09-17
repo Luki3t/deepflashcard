@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/shared_preferences_provider.dart';
@@ -8,6 +7,7 @@ import '../../core/utils/string_utils.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../../services/tts_service.dart';
+import 'study_navigation.dart';
 import 'study_session_notifier.dart';
 
 enum _AnswerState { idle, correct, partial, wrong }
@@ -56,6 +56,7 @@ class _TypingView extends ConsumerStatefulWidget {
 
 class _TypingViewState extends ConsumerState<_TypingView> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   _AnswerState _state = _AnswerState.idle;
   int _hintLetters = 0;
 
@@ -68,11 +69,17 @@ class _TypingViewState extends ConsumerState<_TypingView> {
         _state = _AnswerState.idle;
         _hintLetters = 0;
       });
+      // The field was disabled while the answer was shown, which drops focus
+      // (and the keyboard); give it back so the user can type straight away.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
     }
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -125,7 +132,9 @@ class _TypingViewState extends ConsumerState<_TypingView> {
     ref.read(ttsServiceProvider).speak(card.targetText, deck.targetLanguage);
   }
 
-  Future<void> _rate5() => _rate(5);
+  Future<void> _rate5() async {
+    if (mounted) await _rate(5);
+  }
 
   Future<void> _rate(int rating) => ref
       .read(studySessionProvider(widget.deckId).notifier)
@@ -173,7 +182,12 @@ class _TypingViewState extends ConsumerState<_TypingView> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _controller,
+              focusNode: _focusNode,
               autofocus: true,
+              // The answer is compared letter by letter, so the keyboard must
+              // not "fix" it (e.g. Gboard turning "tree" into "three").
+              autocorrect: false,
+              enableSuggestions: false,
               enabled: !revealed,
               decoration: InputDecoration(
                 hintText: 'Type the translation...',
@@ -372,7 +386,7 @@ class _SummaryScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 if (stats.reviewed > 0) ...[
                   Text(
-                    '${stats.reviewed} cards reviewed',
+                    '${countLabel(stats.reviewed, 'card')} reviewed',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -430,13 +444,7 @@ class _SummaryScreen extends ConsumerWidget {
                   ],
                 ],
                 TextButton(
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
+                  onPressed: () => leaveStudySession(context, deckId),
                   child: Text(
                     deckId != null ? 'Back to Deck' : 'Back to Decks',
                   ),

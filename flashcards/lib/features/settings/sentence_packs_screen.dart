@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/utils/network_error.dart';
 import '../../data/sentences/sentences_database.dart';
 import '../../features/onboarding/language_preferences_provider.dart';
 import '../../services/tatoeba_download_service.dart';
 
 class SentencePacksScreen extends ConsumerStatefulWidget {
-  const SentencePacksScreen({super.key});
+  const SentencePacksScreen({super.key, this.sourceCode, this.targetCode});
+
+  /// The language pair to list first. Opened from a deck, this is the deck's
+  /// pair; left null (Settings), it falls back to the language preferences.
+  final String? sourceCode;
+  final String? targetCode;
 
   @override
   ConsumerState<SentencePacksScreen> createState() =>
@@ -29,7 +35,7 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool refresh = false}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -37,7 +43,7 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
     try {
       final svc = ref.read(tatoebaDownloadServiceProvider);
       final db = ref.read(sentencesDatabaseProvider);
-      final manifest = await svc.fetchManifest();
+      final manifest = await svc.fetchManifest(forceRefresh: refresh);
       final downloaded = await db.downloadedPairs();
       if (mounted) {
         setState(() {
@@ -47,11 +53,12 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = friendlyNetworkError(e);
           _loading = false;
         });
+      }
     }
   }
 
@@ -71,17 +78,20 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
               if (mounted) setState(() => _progress[key] = p);
             },
           );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _downloaded.add(key);
           _downloading.remove(key);
         });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _downloading.remove(key));
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed. ${friendlyNetworkError(e)}'),
+          ),
+        );
       }
     }
   }
@@ -94,8 +104,8 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
 
   Widget _buildList(BuildContext context, WidgetRef ref) {
     final langPrefs = ref.watch(languagePreferencesProvider);
-    final nativeCode = langPrefs.nativeCode;
-    final targetCode = langPrefs.targetCode;
+    final nativeCode = widget.sourceCode ?? langPrefs.nativeCode;
+    final targetCode = widget.targetCode ?? langPrefs.targetCode;
 
     final allPairs = _manifest?.pairs.entries.toList() ?? [];
 
@@ -121,6 +131,15 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
           ),
         ),
         const Divider(),
+        if (relevantPairs.isEmpty && otherPairs.isNotEmpty)
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: Text(
+              'No sentence pack is available for '
+              '${languageName(nativeCode)} and ${languageName(targetCode)} yet. '
+              'Packs currently pair a language with English.',
+            ),
+          ),
         if (relevantPairs.isEmpty && otherPairs.isEmpty)
           const ListTile(
             title: Text('No packs available — check your internet connection.'),
@@ -160,7 +179,7 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
         Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'Example sentences from Tatoeba.org — CC BY 2.0\n'
+            'Example sentences from Tatoeba.org — CC BY 2.0 FR\n'
             'tatoeba.org contributors',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -235,12 +254,7 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Check for updates',
-            onPressed: () async {
-              await ref
-                  .read(tatoebaDownloadServiceProvider)
-                  .invalidateManifestCache();
-              _load();
-            },
+            onPressed: () => _load(refresh: true),
           ),
         ],
       ),
@@ -256,13 +270,16 @@ class _SentencePacksScreenState extends ConsumerState<SentencePacksScreen> {
                     const Icon(Icons.cloud_off, size: 48),
                     const SizedBox(height: 16),
                     Text(
-                      'Could not load manifest',
+                      'Could not load sentence packs',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     Text(_error!, style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 16),
-                    FilledButton(onPressed: _load, child: const Text('Retry')),
+                    FilledButton(
+                      onPressed: () => _load(refresh: true),
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/utils/string_utils.dart';
 import '../../core/widgets/language_dropdown.dart';
 import '../../data/database/app_database.dart';
+import '../../data/database/flash_card_status.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../onboarding/language_preferences_provider.dart';
 import '../stats/stats_providers.dart';
@@ -79,9 +81,7 @@ class _DeckCard extends ConsumerWidget {
     final cardsAsync = ref.watch(watchCardsForDeckProvider(deck.id));
     final cards = cardsAsync.value ?? [];
     final now = DateTime.now();
-    final dueCount = cards
-        .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
-        .length;
+    final dueCount = cards.where((c) => c.isDue(now)).length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -111,7 +111,7 @@ class _DeckCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${cards.length} cards',
+                      countLabel(cards.length, 'card'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

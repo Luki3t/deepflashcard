@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The notification icon is only referenced by name from Dart
+     (AndroidInitializationSettings('ic_stat_notify')) and looked up with
+     getIdentifier() at runtime, so the release resource shrinker can't see it
+     is used and strips it. Without it the plugin's initialize() fails, and a
+     scheduled daily reminder crashes the app when it fires. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_notify" />

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/languages.dart';
+import '../../core/utils/string_utils.dart';
 import '../../core/widgets/language_dropdown.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/cards_repository.dart';
@@ -271,8 +272,8 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
         Text(_fileName ?? '', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Text(
-          '${parsed.rows.length} valid card(s) found'
-          '${parsed.errors.isNotEmpty ? ', ${parsed.errors.length} row(s) skipped' : ''}',
+          '${countLabel(parsed.rows.length, 'valid card')} found'
+          '${parsed.errors.isNotEmpty ? ', ${countLabel(parsed.errors.length, 'row')} skipped' : ''}',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -425,7 +426,7 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
         const SizedBox(height: 24),
         FilledButton(
           onPressed: canImport ? _import : null,
-          child: Text('Import ${parsed.rows.length} card(s)'),
+          child: Text('Import ${countLabel(parsed.rows.length, 'card')}'),
         ),
         const SizedBox(height: 8),
         TextButton(
@@ -467,7 +468,7 @@ class _ImportCsvScreenState extends ConsumerState<ImportCsvScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '$_importedCount card(s) imported',
+              '${countLabel(_importedCount, 'card')} imported',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 24),

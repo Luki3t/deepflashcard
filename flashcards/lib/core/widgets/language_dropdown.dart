@@ -25,6 +25,9 @@ class LanguageDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: value,
+      // Lets long names ("🇵🇹 Portuguese", large font scales) ellipsize
+      // instead of running under the dropdown arrow.
+      isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),

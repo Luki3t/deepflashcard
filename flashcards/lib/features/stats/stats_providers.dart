@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database/app_database.dart';
+import '../../data/database/flash_card_status.dart';
 import '../../data/repositories/cards_repository.dart';
 import '../../data/repositories/decks_repository.dart';
 import '../../data/repositories/reviews_repository.dart';
@@ -79,9 +80,7 @@ final statsDataProvider = FutureProvider.autoDispose<StatsData>((ref) async {
   return StatsData(
     userStat: userStat,
     totalCards: allCards.length,
-    dueNow: allCards
-        .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
-        .length,
+    dueNow: allCards.where((c) => c.isDue(now)).length,
     learnedCards: allCards.where((c) => c.repetitions >= 3).length,
     deckProgress: deckProgress,
     activityMap: activityMap,
@@ -102,9 +101,7 @@ final todayProgressProvider =
       final reviewsRepo = ref.read(reviewsRepositoryProvider);
 
       final allCards = await cardsRepo.getAllCards();
-      final due = allCards
-          .where((c) => !c.nextReview.isAfter(now) && c.repetitions > 0)
-          .length;
+      final due = allCards.where((c) => c.isDue(now)).length;
       if (due == 0) return (reviewed: 0, due: 0);
 
       final todayReviews = await reviewsRepo.getReviewsForDate(today);
